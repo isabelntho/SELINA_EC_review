@@ -1,36 +1,116 @@
 ---
-title: "Untitled"
+title: "SELINA T3.2 EC indicators review dashboard"
 output: 
   flexdashboard::flex_dashboard:
     orientation: columns
     vertical_layout: fill
+    theme:
+      version: 4
+      bootswatch: yeti
+runtime: shiny
 ---
 
 ```{r setup, include=FALSE}
 library(flexdashboard)
+library(openxlsx)
+library(DT)
+library(shiny)
+library(knitr)
+library(dplyr)
+review_drive <- "Y:/EU_BioES_SELINA/WP3/1. T3.2_review/SLR_data/"
+pubs <- read.xlsx(paste0(review_drive,"publications_recoded.xlsx"))
+SELINA_list <- c("Austria", "Belgium", "Bulgaria", "Croatia", "Cyprus", "Czech Republic", "Denmark", "Estonia", "Finland", "France", "Germany", "Greece", "Hungary", "Ireland", "Italy", "Latvia", "Lithuania", "Luxembourg", "Malta", "Netherlands", "Poland", "Portugal", "Romania", "Slovakia", "Slovenia", "Spain", "Sweden", "Norway", "United Kingdom", "Israel","Switzerland", "Norway")
+#source("Y:/EU_BioES_SELINA/WP3/1. T3.2_review/SLR_data/plots_presentation.R")
+source("Y:/EU_BioES_SELINA/WP3/1. T3.2_review/EC_review_dashboard/create_figures.R")
+inds$survey_id<-as.numeric(inds$survey_id)
+
+```
+Column {.sidebar data-width=250}
+-------------------------------------
+```{r} 
+selectInput("ET", label="Ecosystem type",choices=c("Urban","Rivers and lakes", "All"))
+checkboxInput("selina", "Filter to data from publications from countries represented by the SELINA consortium")
+checkboxInput("ET_exclusive", "Filter to data from publications only covering this ecosystem type")
+knitr::include_graphics("Y:/EU_BioES_SELINA/admin/SELINA_logo.jpg")
 ```
 
-Column {data-width=650}
+Column {data-width=800}
 -----------------------------------------------------------------------
 
-### Chart A
-
 ```{r}
 
+pubs_show <- reactive({
+  if(input$selina){
+    pub_ids <- pubs%>%mutate(P5_recoded = strsplit(as.character(P5_recoded), "; ")) %>% 
+    unnest(P5_recoded)%>%filter(P5_recoded%in%SELINA_list)
+    if(input$ET=="All"){
+      pubs_et_overview %>% filter(P0%in%pub_ids$P0)%>%
+      select(P0, P1, P3, P4, P5_recoded, P7)
+    }else{
+      pubs %>% filter(P0%in%pub_ids$P0)%>%
+      select(P0, P1, P3, P4, P5_recoded, P7)%>%
+      filter(P7==input$ET)%>%
+      select(-P7)}
+    }else{
+    if(input$ET=="All"){
+      pubs_et_overview %>% 
+      select(P0, P1, P3, P4, P5_recoded, P7)
+    }else{
+      pubs %>%
+      select(P0, P1, P3, P4, P5_recoded, P7)%>%
+      filter(P7==input$ET)%>%
+      select(-P7)}
+  }
+})
+
+inds_show <- reactive({
+  if(input$selina){
+    pub_ids <- pubs%>%mutate(P5_recoded = strsplit(as.character(P5_recoded), "; ")) %>% 
+    unnest(P5_recoded)%>%filter(P5_recoded%in%SELINA_list)
+    if(input$ET=="All"){
+      ps <- pubs_et_overview %>% filter(P0%in%pub_ids$P0)%>%
+      select(id, P0, P1, P3, P4, P5_recoded, P7)
+      inds %>% filter(survey_id %in% ps$id)
+    }else{
+      ps <- pubs %>% filter(P0%in%pub_ids$P0)%>%
+      select(id, P0, P1, P3, P4, P5_recoded, P7)%>%
+      filter(P7==input$ET)%>%
+      select(-P7)}
+      inds %>% filter(survey_id %in% ps$id)
+    }else{
+    if(input$ET=="All"){
+      ps <- pubs_et_overview %>% 
+      select(id, P0, P1, P3, P4, P5_recoded, P7)
+      inds %>% filter(survey_id %in% ps$id)
+    }else{
+      ps <- pubs %>%
+      select(id, P0, P1, P3, P4, P5_recoded, P7)%>%
+      filter(P7==input$ET)%>%
+      select(-P7)}
+      inds %>% filter(survey_id %in% ps$id)
+  }
+})
+
+tabsetPanel(
+  tabPanel("Overview",
+           splitLayout(cellWidths=c("100px","100px"),shinydashboard::renderValueBox(
+           shinydashboard::valueBox({nrow(pubs_show())}, subtitle="Publications")),
+           shinydashboard::renderValueBox(
+           shinydashboard::valueBox({nrow(inds_show())}, subtitle="Indicators"))),
+           renderPlotly({world_map_et(input$ET, pubs_show())})), 
+  tabPanel("Publications", 
+           h4("Studies retrieved from review for selected ecosystem type"),
+           renderDataTable(pubs_show(),fillContainer=F),
+           style = "height:850px; overflow-y: scroll;"
+  ),
+  tabPanel("Indicators",
+           renderPlot({ect_graph_et(input$ET, inds_show())}, width=800),
+           renderDataTable(inds_show()%>%select(M1, M3, S1, S2), fillContainer=F),
+           style = "height:850px; overflow-y: scroll;"),
+  tabPanel("Datasets"),
+  tabPanel("About",
+          h4(""))
+)
+
+
 ```
-
-Column {data-width=350}
------------------------------------------------------------------------
-
-### Chart B
-
-```{r}
-
-```
-
-### Chart C
-
-```{r}
-
-```
-
